@@ -76,9 +76,6 @@ func GetPokemonNamesFromAPI() ([]string, error) {
 	return pokemon, err
 }
 
-// Language: go
-// Get pokemon data from pokeapi and return it as a JSON
-
 func GetPokemonDataFromAPI(c *gin.Context) (map[string]interface{}, error) {
 
 	url := "https://pokeapi.co/api/v2/pokemon/" + c.Param("name")
