@@ -21,13 +21,22 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 func main() {
 	g := gin.New()
 
-	g.GET("/pokemon", func(c *gin.Context) {
+	g.GET("/og", func(c *gin.Context) {
 		names, err := GetPokemonNamesFromAPI()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"pokemon": names})
+	})
+
+	g.GET("/pokemon/:name", func(c *gin.Context) {
+		data, err := GetPokemonDataFromAPI(c)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"pokemon": data})
 	})
 
 	ginLambda = ginadapter.New(g)
@@ -63,6 +72,34 @@ func GetPokemonNamesFromAPI() ([]string, error) {
 	for _, p := range pokemonList {
 		pokemon = append(pokemon, p.(map[string]interface{})["name"].(string))
 	}
+
+	return pokemon, err
+}
+
+// Language: go
+// Get pokemon data from pokeapi and return it as a JSON
+
+func GetPokemonDataFromAPI(c *gin.Context) (map[string]interface{}, error) {
+
+	url := "https://pokeapi.co/api/v2/pokemon/" + c.Param("name")
+	var pokemon map[string]interface{}
+
+	client := &http.Client{
+		Timeout: time.Second * 2,
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
+	req.Header.Set("User-Agent", "go-test")
+
+	resp, err := client.Do(req)
+
+	if err != nil || resp.StatusCode != 200 {
+		return pokemon, err
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+
+	json.Unmarshal(body, &pokemon)
 
 	return pokemon, err
 }
