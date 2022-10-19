@@ -43,11 +43,7 @@ func main() {
 	lambda.Start(handler)
 }
 
-func GetPokemonNamesFromAPI() ([]string, error) {
-
-	url := "https://pokeapi.co/api/v2/pokemon?limit=151"
-	var pokemon []string
-
+func ApiRequest(url string) ([]byte, error) {
 	client := &http.Client{
 		Timeout: time.Second * 2,
 	}
@@ -58,14 +54,24 @@ func GetPokemonNamesFromAPI() ([]string, error) {
 	resp, err := client.Do(req)
 
 	if err != nil || resp.StatusCode != 200 {
-		return pokemon, err
+		return nil, err
 	}
-
-	var result map[string]interface{}
 
 	body, err := ioutil.ReadAll(resp.Body)
 
-	json.Unmarshal(body, &result)
+	return body, err
+}
+
+func GetPokemonNamesFromAPI() ([]string, error) {
+
+	url := "https://pokeapi.co/api/v2/pokemon?limit=151"
+	var pokemon []string
+
+	var result map[string]interface{}
+
+	resp, err := ApiRequest(url)
+
+	json.Unmarshal(resp, &result)
 
 	pokemonList := result["results"].([]interface{})
 
@@ -81,22 +87,9 @@ func GetPokemonDataFromAPI(c *gin.Context) (map[string]interface{}, error) {
 	url := "https://pokeapi.co/api/v2/pokemon/" + c.Param("name")
 	var pokemon map[string]interface{}
 
-	client := &http.Client{
-		Timeout: time.Second * 2,
-	}
+	resp, err := ApiRequest(url)
 
-	req, err := http.NewRequest("GET", url, nil)
-	req.Header.Set("User-Agent", "go-test")
-
-	resp, err := client.Do(req)
-
-	if err != nil || resp.StatusCode != 200 {
-		return pokemon, err
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-
-	json.Unmarshal(body, &pokemon)
+	json.Unmarshal(resp, &pokemon)
 
 	return pokemon, err
 }
