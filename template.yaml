@@ -1,218 +1,31 @@
-AWSTemplateFormatVersion: "2010-09-09"
+AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: pokemon API for training project
-
-Parameters:
-  Region:
-    Type: String
-    Default: us-west-2
-    Description: The region to deploy the code to.
-  EnvStageName:
-    Default: dev
-    Description: The environment name (e.g. dev, prod, etc.)
-    Type: String
-  StoriAppVpc:
-    Default: stori-app-vpc
-    Type: String
-    Description: The VPC where the resources will be deployed
-  LambdaSecurityGroupName:
-    Default: LambdaSecurityGroups
-    Description:
-      The logical name of the security group that will be given to the Lambda function.
-      This should come from the export value of the core-data-analytics-vpc stack.
-    Type: String
-  LambdaSubnetsName:
-    Default: LambdaSubnets
-    Description:
-      The logical name of the subnets that will be given to the Lambda function.
-      This should come from the export value of the core-data-analytics-vpc stack.
-    Type: String
-  CoreDataCommonStack:
-    Default: core-data-common
-    Description: The name of the core data common stack that contains the resources required for reuse.
-    Type: String
-  DefaultRoleName:
-    Type: String
-    Default: CoreDataLambdaRole
-  NuveiSecretName:
-    Type: String
-    Default: nuvei
-
-Mappings:
-  domain:
-    dev:
-      name: dev-api.powerup.ai
-    qa:
-      name: api.storicard-qa.com
-    prod:
-      name: api.storicard.com
-  cognito:
-    prod:
-      poolarn: "arn:aws:cognito-idp:us-east-1:289021957213:userpool/us-east-1_ct2IZTkU4"
-    qa:
-      poolarn: "arn:aws:cognito-idp:us-east-1:617324368856:userpool/us-east-1_G9fvXucqL"
-    dev:
-      poolarn: "arn:aws:cognito-idp:us-west-2:565555147445:userpool/us-west-2_2Ak875ELK"
-  arn:
-    prod:
-      messageCenterArn: "arn:aws:sns:us-east-1:289021957213:sori-message-center-trigger"
-    qa:
-      messageCenterArn: "arn:aws:sns:us-east-1:617324368856:sori-message-center-trigger"
-    dev:
-      messageCenterArn: "arn:aws:sns:us-west-2:565555147445:sori-message-center-trigger"
-  gin:
-    prod:
-      mode: release
-    qa:
-      mode: debug
-    dev:
-      mode: debug
-
-Globals:
-  Function:
-    Handler: main
-    Runtime: go1.x
-    Timeout: 5
-    Tracing: Active
-    VpcConfig:
-      SecurityGroupIds:
-        Fn::Split:
-          - ","
-          - Fn::ImportValue:
-              Fn::Join:
-                - "-"
-                - - Ref: StoriAppVpc
-                  - Ref: LambdaSecurityGroupName
-                  - Ref: EnvStageName
-      SubnetIds:
-        Fn::Split:
-          - ","
-          - Fn::ImportValue:
-              Fn::Join:
-                - "-"
-                - - Ref: StoriAppVpc
-                  - Ref: LambdaSubnetsName
-                  - Ref: EnvStageName
-
+Description: Example Lambda Gin
 Resources:
-  HadzaPokemonPublicApi:
-    Type: AWS::Serverless::Api
-    Properties:
-      StageName: !Ref EnvStageName
-      Cors:
-        AllowMethods: "'GET, POST'"
-        AllowHeaders: "'*'"
-        AllowOrigin: "'*'"
-
-#  ApiGwToUsagePlanCalloutPublic:
-#    Type: Custom::LambdaCallout
-#    Properties:
-#      ServiceToken:
-#        Fn::ImportValue:
-#          Fn::Join:
-#            - "-"
-#            - - Ref: CoreDataCommonStack
-#              - "UpdateUsagePlanFunction"
-#              - Ref: EnvStageName
-#              - Arn
-#      usage_plan_id:
-#        Fn::ImportValue:
-#          Fn::Join:
-#            - "-"
-#            - - Ref: CoreDataCommonStack
-#              - "StoriCardApiUsagePlan"
-#              - Ref: EnvStageName
-#      api_gw: !Ref RemittanceRequestsPublicApi
-#      api_gw_stage: !Ref RemittanceRequestsPublicApi.Stage
-
-  DomainNameMappingPublic:
-    Type: AWS::ApiGateway::BasePathMapping
-    Properties:
-      BasePath: hadza-pokemon
-      DomainName: !FindInMap [domain, !Ref EnvStageName, name]
-      RestApiId: !Ref HadzaPokemonPublicApi
-      Stage: !Ref HadzaPokemonPublicApi.Stage
-
-  HadzaPokemonApi:
-    Type: AWS::Serverless::Api
-    Properties:
-      StageName: !Ref EnvStageName
-      Cors:
-        AllowMethods: "'GET, POST, DELETE'"
-        AllowHeaders: "'*'"
-        AllowOrigin: "'*'"
-      Auth:
-        DefaultAuthorizer: StoriCognitoAuth
-        AddDefaultAuthorizerToCorsPreflight: false
-        Authorizers:
-          StoriCognitoAuth:
-            UserPoolArn: !FindInMap [cognito, !Ref EnvStageName, poolarn]
-#
-#  ApiGwToUsagePlanCallout:
-#    Type: Custom::LambdaCallout
-#    Properties:
-#      ServiceToken:
-#        Fn::ImportValue:
-#          Fn::Join:
-#            - "-"
-#            - - Ref: CoreDataCommonStack
-#              - "UpdateUsagePlanFunction"
-#              - Ref: EnvStageName
-#              - Arn
-#      usage_plan_id:
-#        Fn::ImportValue:
-#          Fn::Join:
-#            - "-"
-#            - - Ref: CoreDataCommonStack
-#              - "StoriCardApiUsagePlan"
-#              - Ref: EnvStageName
-#      api_gw: !Ref RemittanceRequestsApi
-#      api_gw_stage: !Ref RemittanceRequestsApi.Stage
-#
-#  DomainNameMapping:
-#    Type: AWS::ApiGateway::BasePathMapping
-#    Properties:
-#      BasePath: sa-remittance-requests
-#      DomainName: !FindInMap [domain, !Ref EnvStageName, name]
-#      RestApiId: !Ref RemittanceRequestsApi
-#      Stage: !Ref RemittanceRequestsApi.Stage
-
-  ####################
-  # Lambda functions #
-  ####################
-
-  HadzaPokemonFunction:
+  PokemonFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: cmd/lambda
+      Handler: main
+      CodeUri: "cmd/lambda"
+      Runtime: go1.x
+      Role: "arn:aws:iam::565555147445:role/core-data-common-CoreDataLambdaRole-dev"
+      MemorySize: 128
+      Policies: AWSLambdaBasicExecutionRole
+      Timeout: 3
       Events:
-        GetOGPokemonList:
-          Properties:
-            Method: GET
-            Path: /og
-            RestApiId: !Ref HadzaPokemonPublicApi
-          Type: Api
         GetPokemonByName:
-          Properties:
-            Method: GET
-            Path: /pokemon/{name}
-            RestApiId: !Ref HadzaPokemonPublicApi
           Type: Api
-      FunctionName: !Sub ${AWS::StackName}-ManageRemittanceRequestsFunction-${EnvStageName}
-      Role:
-        Fn::ImportValue:
-          Fn::Join:
-            - "-"
-            - - !Ref CoreDataCommonStack
-              - !Ref DefaultRoleName
-              - !Ref EnvStageName
-              - Arn
-      Environment:
-        Variables:
-          GIN_MODE: !FindInMap [gin, !Ref EnvStageName, mode]
-
-  ManageRemittanceRequestsLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Join ["/", ["/aws/lambda", !Ref HadzaPokemonFunction]]
-      RetentionInDays: 90 # days
+          Properties:
+            Path: /pokemon/{name}
+            Method: GET
+        GetOGPokemonList:
+          Type: Api
+          Properties:
+            Path: /og
+            Method: GET
+Outputs:
+  PokemonGinApi:
+    Description: URL for application
+    Value: !Sub 'https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/hadza'
+    Export:
+      Name: SampleGinApi
