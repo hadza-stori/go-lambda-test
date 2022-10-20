@@ -1,0 +1,102 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambda"
+	ginadapter "github.com/awslabs/aws-lambda-go-api-proxy/gin"
+	"github.com/gin-gonic/gin"
+	"io/ioutil"
+	"net/http"
+	"time"
+)
+
+var ginLambda *ginadapter.GinLambda
+
+func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	return ginLambda.ProxyWithContext(ctx, request)
+}
+
+func main() {
+	g := gin.New()
+
+	g.GET("/og", func(c *gin.Context) {
+		names, err := GetPokemonNamesFromAPI()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"pokemon": names})
+	})
+
+	g.GET("/pokemon/:name", func(c *gin.Context) {
+		data, err := GetPokemonDataFromAPI(c)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"pokemon": data})
+	})
+
+	ginLambda = ginadapter.New(g)
+	lambda.Start(handler)
+}
+
+func GetPokemonNamesFromAPI() ([]string, error) {
+
+	url := "https://pokeapi.co/api/v2/pokemon?limit=151"
+	var pokemon []string
+
+	client := &http.Client{
+		Timeout: time.Second * 2,
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
+	req.Header.Set("User-Agent", "go-test")
+
+	resp, err := client.Do(req)
+
+	if err != nil || resp.StatusCode != 200 {
+		return pokemon, err
+	}
+
+	var result map[string]interface{}
+
+	body, err := ioutil.ReadAll(resp.Body)
+
+	json.Unmarshal(body, &result)
+
+	pokemonList := result["results"].([]interface{})
+
+	for _, p := range pokemonList {
+		pokemon = append(pokemon, p.(map[string]interface{})["name"].(string))
+	}
+
+	return pokemon, err
+}
+
+func GetPokemonDataFromAPI(c *gin.Context) (map[string]interface{}, error) {
+
+	url := "https://pokeapi.co/api/v2/pokemon/" + c.Param("name")
+	var pokemon map[string]interface{}
+
+	client := &http.Client{
+		Timeout: time.Second * 2,
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
+	req.Header.Set("User-Agent", "go-test")
+
+	resp, err := client.Do(req)
+
+	if err != nil || resp.StatusCode != 200 {
+		return pokemon, err
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+
+	json.Unmarshal(body, &pokemon)
+
+	return pokemon, err
+}
