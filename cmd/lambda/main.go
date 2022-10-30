@@ -7,12 +7,51 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	ginadapter "github.com/awslabs/aws-lambda-go-api-proxy/gin"
 	"github.com/gin-gonic/gin"
-	"io/ioutil"
+	"io"
+	"log"
 	"net/http"
 	"time"
 )
 
 var ginLambda *ginadapter.GinLambda
+
+type Pokemon struct {
+	Name  string `json:"name"`
+	Id    int    `json:"id"`
+	Moves []struct {
+		Move struct {
+			Name string `json:"name"`
+			Url  string `json:"url"`
+		}
+	}
+	Stats []struct {
+		BaseStat int `json:"base_stat"`
+		Effort   int `json:"effort"`
+		Stat     struct {
+			Name string `json:"name"`
+			Url  string `json:"url"`
+		}
+	}
+	Types []struct {
+		Slot int `json:"slot"`
+		Type struct {
+			Name string `json:"name"`
+			Url  string `json:"url"`
+		}
+	}
+}
+
+type PokemonList struct {
+	Count    int               `json:"count"`
+	Next     string            `json:"next"`
+	Previous string            `json:"previous"`
+	Results  []PokemonListItem `json:"results"`
+}
+
+type PokemonListItem struct {
+	Name string `json:"name"`
+	Url  string `json:"url"`
+}
 
 func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	return ginLambda.ProxyWithContext(ctx, request)
@@ -27,7 +66,7 @@ func main() {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"pokemon": names})
+		c.JSON(http.StatusOK, gin.H{"results": names})
 	})
 
 	g.GET("/pokemon/:name", func(c *gin.Context) {
@@ -43,7 +82,7 @@ func main() {
 	lambda.Start(handler)
 }
 
-func ApiRequest(url string) ([]byte, error) {
+func ApiRequest(url string) (io.ReadCloser, error) {
 	client := &http.Client{
 		Timeout: time.Second * 2,
 	}
@@ -57,39 +96,32 @@ func ApiRequest(url string) ([]byte, error) {
 		return nil, err
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
-
-	return body, err
+	return resp.Body, err
 }
 
-func GetPokemonNamesFromAPI() ([]string, error) {
+func GetPokemonNamesFromAPI() (PokemonList, error) {
 
 	url := "https://pokeapi.co/api/v2/pokemon?limit=151"
-	var pokemon []string
-
-	var result map[string]interface{}
+	var pokemonList PokemonList
 
 	resp, err := ApiRequest(url)
 
-	json.Unmarshal(resp, &result)
+	err = json.NewDecoder(resp).Decode(&pokemonList)
 
-	pokemonList := result["results"].([]interface{})
+	log.Println(pokemonList)
 
-	for _, p := range pokemonList {
-		pokemon = append(pokemon, p.(map[string]interface{})["name"].(string))
-	}
-
-	return pokemon, err
+	return pokemonList, err
 }
 
-func GetPokemonDataFromAPI(c *gin.Context) (map[string]interface{}, error) {
+func GetPokemonDataFromAPI(c *gin.Context) (Pokemon, error) {
 
 	url := "https://pokeapi.co/api/v2/pokemon/" + c.Param("name")
-	var pokemon map[string]interface{}
+	var pokemon Pokemon
 
 	resp, err := ApiRequest(url)
+	err = json.NewDecoder(resp).Decode(&pokemon)
 
-	json.Unmarshal(resp, &pokemon)
+	log.Println(pokemon)
 
 	return pokemon, err
 }
