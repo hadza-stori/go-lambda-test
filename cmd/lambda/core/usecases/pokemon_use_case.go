@@ -1,14 +1,24 @@
 package usecases
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"testProject/core/entities"
 	"testProject/utils"
 )
 
-func GetPokemon(pkm entities.Pokemon) (entities.Pokemon, error) {
+type PokemonUseCase struct {
+	PokemonRepo IPokemonRepo
+}
 
+func GetPokemonUseCase(pokemonRepo IPokemonRepo) PokemonUseCase {
+	return PokemonUseCase{
+		PokemonRepo: pokemonRepo,
+	}
+}
+
+func (uc *PokemonUseCase) Execute(ctx context.Context, pkm entities.Pokemon) (entities.Pokemon, error) {
 	url := "https://pokeapi.co/api/v2/pokemon/" + pkm.Name
 	var pokemon entities.Pokemon
 
