@@ -5,7 +5,6 @@ import (
 	"errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"log"
 	"testProject/core/entities"
 	"testProject/core/usecases"
 	"testProject/tests/mocks"
@@ -22,10 +21,7 @@ func TestGetPokemon(t *testing.T) {
 			Name: "ditto",
 		}
 
-		PokemonRepoSpy.On("GetPokemon", ctx, pkm).Return(errors.New("on any error")).Run(func(args mock.Arguments) {
-			arg := args.Get(0).(entities.Pokemon)
-			log.Println("GetPokemon called with args: ", arg)
-		})
+		PokemonRepoSpy.On("GetPokemon", ctx, pkm).Return(errors.New("on any error"))
 
 		uc := usecases.GetPokemonUseCase(PokemonRepoSpy)
 		_, err := uc.Execute(ctx, pkm)
